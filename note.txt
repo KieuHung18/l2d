@@ -1,0 +1,29 @@
+using Spine;
+using System.IO;
+
+public static class SpineConverter
+{
+    public static void ConvertBinaryToJson(string binaryPath, string atlasPath, string outputJsonPath)
+    {
+        if (!File.Exists(binaryPath))
+            throw new FileNotFoundException("Binary skeleton not found", binaryPath);
+        if (!File.Exists(atlasPath))
+            throw new FileNotFoundException("Atlas file not found", atlasPath);
+
+        string folder = Path.GetDirectoryName(binaryPath)!;
+
+        // Load atlas first
+        var atlas = new Atlas(atlasPath, new SkiaTextureLoader(folder));
+        var loader = new AtlasAttachmentLoader(atlas);
+
+        // Read binary skeleton
+        var binary = new SkeletonBinary(loader);
+        SkeletonData data = binary.ReadSkeletonData(binaryPath);
+
+        // Write JSON
+        var jsonWriter = new SkeletonJson(loader);
+        string json = jsonWriter.WriteSkeletonData(data);
+
+        File.WriteAllText(outputJsonPath, json);
+    }
+}
