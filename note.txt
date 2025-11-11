@@ -1,69 +1,36 @@
 using System;
 using System.IO;
+using System.Text.Json;
 using Spine;
-using SkiaSharp;
 
-class Program
+public static class SpineConverter
 {
-    static void Main(string[] args)
+    public static void ConvertBinaryToJson(string binaryPath, string atlasPath, string outputJsonPath)
     {
-        string folder = AppDomain.CurrentDomain.BaseDirectory;
-        string atlasPath = Path.Combine(folder, "yourFile.atlas");
-        string skelPath = Path.Combine(folder, "yourFile.skel");
-        string outputJson = Path.Combine(folder, "yourFile_converted.json");
+        if (!File.Exists(binaryPath))
+            throw new FileNotFoundException("Binary skeleton not found", binaryPath);
+        if (!File.Exists(atlasPath))
+            throw new FileNotFoundException("Atlas file not found", atlasPath);
 
-        try
+        string folder = Path.GetDirectoryName(binaryPath)!;
+        var atlas = new Atlas(atlasPath, new SkiaTextureLoader(folder));
+        var loader = new AtlasAttachmentLoader(atlas);
+        var binary = new SkeletonBinary(loader);
+
+        SkeletonData data = binary.ReadSkeletonData(binaryPath);
+
+        // Manual lightweight export
+        var export = new
         {
-            var atlas = new Atlas(atlasPath, new SkiaTextureLoader(folder));
-            var loader = new AtlasAttachmentLoader(atlas);
-            var binary = new SkeletonBinary(loader);
-            var skeletonData = binary.ReadSkeletonData(skelPath);
+            Name = data.Name,
+            Bones = data.Bones.Select(b => new { b.Name, b.X, b.Y, b.Rotation, b.ScaleX, b.ScaleY }).ToList(),
+            Slots = data.Slots.Select(s => new { s.Name, s.BoneData.Name, s.AttachmentName }).ToList(),
+            Animations = data.Animations.Select(a => a.Name).ToList()
+        };
 
-            // Convert to JSON
-            var json = new SkeletonJson(loader);
-            string jsonText = json.WriteSkeletonData(skeletonData);
+        string json = JsonSerializer.Serialize(export, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(outputJsonPath, json);
 
-            File.WriteAllText(outputJson, jsonText);
-            Console.WriteLine("✅ Converted to JSON successfully!");
-            Console.WriteLine($"Saved to: {outputJson}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("❌ Error: " + ex.Message);
-        }
-    }
-}
-
-// Include this in the same file or a new file (SkiaTextureLoader.cs)
-public class SkiaTextureLoader : TextureLoader
-{
-    private readonly string folder;
-
-    public SkiaTextureLoader(string folderPath)
-    {
-        folder = folderPath;
-    }
-
-    public void Load(AtlasPage page, string path)
-    {
-        if (!path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-            path += ".png";
-
-        string filePath = Path.Combine(folder, path);
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException("Texture not found", filePath);
-
-        using var data = SKData.Create(filePath);
-        var img = SKImage.FromEncodedData(data);
-
-        page.rendererObject = img;
-        page.width = img.Width;
-        page.height = img.Height;
-    }
-
-    public void Unload(object texture)
-    {
-        if (texture is SKImage img)
-            img.Dispose();
+        Console.WriteLine($"✅ Skeleton converted to readable JSON: {outputJsonPath}");
     }
 }
