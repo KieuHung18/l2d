@@ -1,29 +1,38 @@
-using Spine;
+using System;
 using System.IO;
+using Spine;
+using SkiaSharp;
 
-public static class SpineConverter
+public class SkiaTextureLoader : TextureLoader
 {
-    public static void ConvertBinaryToJson(string binaryPath, string atlasPath, string outputJsonPath)
+    private readonly string folder;
+
+    public SkiaTextureLoader(string folderPath)
     {
-        if (!File.Exists(binaryPath))
-            throw new FileNotFoundException("Binary skeleton not found", binaryPath);
-        if (!File.Exists(atlasPath))
-            throw new FileNotFoundException("Atlas file not found", atlasPath);
+        folder = folderPath;
+    }
 
-        string folder = Path.GetDirectoryName(binaryPath)!;
+    public void Load(AtlasPage page, string path)
+    {
+        // Spine expects textures to come from the atlas
+        if (!path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            path += ".png";
 
-        // Load atlas first
-        var atlas = new Atlas(atlasPath, new SkiaTextureLoader(folder));
-        var loader = new AtlasAttachmentLoader(atlas);
+        string filePath = Path.Combine(folder, path);
+        if (!File.Exists(filePath))
+            throw new FileNotFoundException("Texture not found", filePath);
 
-        // Read binary skeleton
-        var binary = new SkeletonBinary(loader);
-        SkeletonData data = binary.ReadSkeletonData(binaryPath);
+        using var data = SKData.Create(filePath);
+        var img = SKImage.FromEncodedData(data);
 
-        // Write JSON
-        var jsonWriter = new SkeletonJson(loader);
-        string json = jsonWriter.WriteSkeletonData(data);
+        page.rendererObject = img;
+        page.width = img.Width;
+        page.height = img.Height;
+    }
 
-        File.WriteAllText(outputJsonPath, json);
+    public void Unload(object texture)
+    {
+        if (texture is SKImage img)
+            img.Dispose();
     }
 }
