@@ -3,6 +3,38 @@ using System.IO;
 using Spine;
 using SkiaSharp;
 
+class Program
+{
+    static void Main(string[] args)
+    {
+        string folder = AppDomain.CurrentDomain.BaseDirectory;
+        string atlasPath = Path.Combine(folder, "yourFile.atlas");
+        string skelPath = Path.Combine(folder, "yourFile.skel");
+        string outputJson = Path.Combine(folder, "yourFile_converted.json");
+
+        try
+        {
+            var atlas = new Atlas(atlasPath, new SkiaTextureLoader(folder));
+            var loader = new AtlasAttachmentLoader(atlas);
+            var binary = new SkeletonBinary(loader);
+            var skeletonData = binary.ReadSkeletonData(skelPath);
+
+            // Convert to JSON
+            var json = new SkeletonJson(loader);
+            string jsonText = json.WriteSkeletonData(skeletonData);
+
+            File.WriteAllText(outputJson, jsonText);
+            Console.WriteLine("✅ Converted to JSON successfully!");
+            Console.WriteLine($"Saved to: {outputJson}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("❌ Error: " + ex.Message);
+        }
+    }
+}
+
+// Include this in the same file or a new file (SkiaTextureLoader.cs)
 public class SkiaTextureLoader : TextureLoader
 {
     private readonly string folder;
@@ -14,7 +46,6 @@ public class SkiaTextureLoader : TextureLoader
 
     public void Load(AtlasPage page, string path)
     {
-        // Spine expects textures to come from the atlas
         if (!path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
             path += ".png";
 
